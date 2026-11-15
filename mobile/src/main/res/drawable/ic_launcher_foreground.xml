@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 길 위의 방패: 안전한 이동 -->
+    <path android:fillColor="#FFFFFF" android:pathData="M54,30l20,8v14c0,13 -9,22 -20,26c-11,-4 -20,-13 -20,-26v-14z"/>
+    <path android:fillColor="#3E4047" android:pathData="M51,40h6v30h-6z"/>
+</vector>

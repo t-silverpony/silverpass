@@ -1,0 +1,36 @@
+# 빌드 산출물
+build/
+.gradle/
+.kotlin/
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 로컬 환경 (SDK 경로 등 개인 경로가 들어감)
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# 비밀 값 — 절대 커밋하지 않는다. 템플릿(*.example)만 허용.
+secrets/*
+!secrets/*.example
+*.keystore
+*.jks
+.env
+.env.*
+!.env.example
+
+# 42dot 라이선스 대상물(재배포 금지): 시스템 이미지, SDK 산출물, 콘솔 페이지 사본
+*.img
+*.zip
+*.aar
+vconsole.html
+
+# 파이썬 캐시
+__pycache__/
+
+# 제출용 APK는 apk/ 폴더에만 커밋한다
+!apk/*.apk

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 동기화 서버(HTTPS) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 기어(P/R/N/D)로 정차·주행을 구분한다 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <uses-permission android:name="pleos.car.permission.CAR_INFO" />
+    <!-- 내비 경로 조회(get*Info) / 재탐색·시연용 목적지 설정 -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SilverPass">
+        <activity
+            android:name=".VehicleActivity"
+            android:exported="true">
+            <!-- 주행 중에도 화면을 띄운다. 주행 중엔 앱이 스스로 조작 없는 요약 화면만 보여 준다(VehicleApp의 DrivingView). -->
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

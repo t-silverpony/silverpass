@@ -1,0 +1,70 @@
+# 실버패스 동기화 서버 (단일 VPS, Cloudflare 프록시 뒤)
+# 인터넷 ─(HTTPS)─▶ Cloudflare ─(HTTP :80)─▶ edge(nginx) ─▶ app(동기화 서버) ─▶ naver-egress(nginx) ─▶ 네이버 API
+# - app은 인터넷으로 나갈 수 없다(internal 네트워크). 네이버 키는 naver-egress에만 있다.
+# - 모든 컨테이너: 비루트, 읽기 전용 루트, capability 전부 제거, no-new-privileges, 이미지 digest 고정.
+name: silverpass
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: "3" }
+
+services:
+  edge:
+    <<: *hardening
+    image: nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+    ports: ["80:8080"]
+    volumes:
+      - ./edge/default.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs: [/tmp:size=32m]
+    networks: [public, backend]
+    depends_on: [app]
+    mem_limit: 64m
+    cpus: 0.5
+    pids_limit: 64
+
+  app:
+    <<: *hardening
+    # distroless: 셸·패키지 매니저 없음
+    image: gcr.io/distroless/nodejs24-debian13@sha256:088a01637f22908632ba09018be2e0b516f2fa6f7869c191d29491139db43c78
+    user: "65532:65532"
+    command: [--disable-warning=ExperimentalWarning, /srv/server/server.js]
+    environment:
+      PORT: "8080"
+      DB_PATH: /data/silverpass.db
+      TRUST_PROXY: "1"            # edge만 들어오고, edge가 X-Forwarded-For를 실제 클라이언트 IP 하나로 덮어쓴다
+      MAX_ACCOUNTS: "2000"
+      MAX_VEHICLES: "500"
+      NODE_ENV: production
+      NAVER_EGRESS_SERVICE_HOST: naver-egress
+      NAVER_EGRESS_SERVICE_PORT: "8080"
+    volumes:
+      - ../src:/srv/server:ro
+      - ./data:/data
+    networks: [backend]
+    mem_limit: 192m
+    cpus: 1.0
+    pids_limit: 64
+
+  naver-egress:
+    <<: *hardening
+    image: nginxinc/nginx-unprivileged:stable-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03
+    env_file: [./naver.env]       # NAVER_MAPS_CLIENT_ID/SECRET, SEARCH_CLIENT_ID/SECRET (600, 저장소에 넣지 않음)
+    volumes:
+      - ./naver-egress/naver.conf.template:/etc/nginx/templates/naver.conf.template:ro
+    tmpfs:
+      - /etc/nginx/conf.d:size=1m,uid=101,gid=101   # 키가 들어간 설정은 메모리에만
+      - /tmp:size=32m
+    networks: [backend, egress]
+    mem_limit: 64m
+    cpus: 0.5
+    pids_limit: 64
+
+networks:
+  public: {}                 # edge가 포트를 열기 위한 네트워크
+  backend: { internal: true } # 인터넷으로 못 나간다
+  egress: {}                 # naver-egress만 붙어 바깥으로 나간다

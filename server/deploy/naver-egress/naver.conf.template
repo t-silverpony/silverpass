@@ -1,0 +1,69 @@
+# naver-egress: 동기화 서버가 네이버 지도 API(길찾기·주소 변환)를 쓰게 해 주는 전용 출구.
+# - 길찾기·주소 두 경로의 GET은 maps.apigw.ntruss.com, 장소 검색 GET은 naverapihub.apigw.ntruss.com으로만 넘긴다. 그 밖은 404/403.
+# - 네이버 키는 여기서만 붙인다(동기화 서버는 키를 모른다). 키는 시작할 때 envsubst로 메모리(emptyDir)에만 쓴다.
+# - 접속 로그에 쿼리(주소·좌표)를 남기지 않는다.
+log_format naver_nopii '$time_iso8601 $status $request_method $uri $request_time';
+limit_req_zone $binary_remote_addr zone=naver:1m rate=5r/s;
+resolver 127.0.0.11 valid=30s ipv6=off;
+resolver_timeout 3s;
+
+server {
+    listen 8080;
+    server_tokens off;
+    client_max_body_size 1k;
+    access_log /dev/stdout naver_nopii;
+    # error 단계 로그는 요청 줄(쿼리의 주소·좌표)을 그대로 남기므로 crit만 남긴다. 실패는 접속 로그의 상태 코드로 본다.
+    error_log /dev/stderr crit;
+
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    location ~ ^/(map-direction/v1/driving|map-geocode/v2/geocode)$ {
+        limit_except GET { deny all; }
+        limit_req zone=naver burst=20 nodelay;
+        set $naver maps.apigw.ntruss.com;
+        proxy_pass https://$naver$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host maps.apigw.ntruss.com;
+        proxy_set_header x-ncp-apigw-api-key-id "${NAVER_MAPS_CLIENT_ID}";
+        proxy_set_header x-ncp-apigw-api-key "${NAVER_MAPS_CLIENT_SECRET}";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header Cookie "";
+        proxy_ssl_server_name on;
+        proxy_ssl_name maps.apigw.ntruss.com;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 4;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 10s;
+        proxy_hide_header Set-Cookie;
+    }
+
+    # 장소 이름 검색(NAVER API HUB 검색-지역). 키는 별도 Application(SilverPass-Search).
+    location = /search/v1/local {
+        limit_except GET { deny all; }
+        limit_req zone=naver burst=20 nodelay;
+        set $hub naverapihub.apigw.ntruss.com;
+        proxy_pass https://$hub$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host naverapihub.apigw.ntruss.com;
+        proxy_set_header x-ncp-apigw-api-key-id "${SEARCH_CLIENT_ID}";
+        proxy_set_header x-ncp-apigw-api-key "${SEARCH_CLIENT_SECRET}";
+        proxy_set_header X-Forwarded-For "";
+        proxy_set_header Cookie "";
+        proxy_ssl_server_name on;
+        proxy_ssl_name naverapihub.apigw.ntruss.com;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 4;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 10s;
+        proxy_hide_header Set-Cookie;
+    }
+
+    location / {
+        return 404;
+    }
+}
